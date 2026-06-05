@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# load-bearing cache and data files
+messages.db
+candidates.json
+verified_metaphors.json
+trends.json
+trends.js

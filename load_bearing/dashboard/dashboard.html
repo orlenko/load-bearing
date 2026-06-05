@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>load-bearing: AI Metaphor Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b0e14;
+            --card-bg: rgba(20, 25, 35, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f0f6fc;
+            --text-muted: #8b949e;
+            --accent-primary: #00f2fe;
+            --accent-secondary: #7f00ff;
+            --accent-claude: #ff8a65;
+            --accent-gemini: #38bdf8;
+            --highlight-bg: rgba(0, 242, 254, 0.2);
+            --highlight-border: #00f2fe;
+            --font-display: 'Plus Jakarta Sans', sans-serif;
+            --font-body: 'Outfit', sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            overflow-x: hidden;
+            line-height: 1.5;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        .glass-card:hover { border-color: rgba(255, 255, 255, 0.15); }
+
+        .container { max-width: 1600px; margin: 0 auto; padding: 24px; }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .header-title h1 {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 2.2rem;
+            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+        }
+        .header-title p { color: var(--text-muted); font-size: 1rem; }
+
+        /* Summary Stats Row */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+        .stat-card { padding: 20px; display: flex; flex-direction: column; }
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+        }
+        .stat-value {
+            font-family: var(--font-display);
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+        .stat-desc { font-size: 0.8rem; color: var(--accent-primary); margin-top: 4px; }
+
+        /* Main Workspace Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 3fr 2fr;
+            gap: 24px;
+            align-items: start;
+        }
+        @media (max-width: 1200px) {
+            .main-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Chart Column */
+        .left-column { display: flex; flex-direction: column; gap: 24px; }
+        .chart-card { padding: 24px; }
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .chart-title { font-family: var(--font-display); font-weight: 600; font-size: 1.3rem; }
+        .chart-controls { display: flex; gap: 12px; align-items: center; }
+        
+        .btn-toggle {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-family: var(--font-body);
+            transition: all 0.2s;
+        }
+        .btn-toggle.active {
+            background: var(--accent-primary);
+            color: #000;
+            font-weight: 600;
+            border-color: var(--accent-primary);
+        }
+
+        .filter-checkboxes { display: flex; gap: 16px; margin-left: 12px; font-size: 0.9rem; }
+        .filter-checkboxes label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
+        .chart-container { position: relative; height: 420px; width: 100%; }
+
+        /* Right Column */
+        .right-column { display: flex; flex-direction: column; gap: 24px; }
+        .list-card { padding: 24px; max-height: 850px; display: flex; flex-direction: column; }
+        
+        .search-box { position: relative; margin-bottom: 16px; }
+        .search-input {
+            width: 100%;
+            padding: 12px 16px 12px 40px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            color: var(--text-main);
+            font-family: var(--font-body);
+            font-size: 0.95rem;
+            outline: none;
+        }
+        .search-input:focus { border-color: var(--accent-primary); }
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            width: 16px;
+            height: 16px;
+        }
+
+        .metaphors-list { overflow-y: auto; flex-grow: 1; padding-right: 4px; }
+        .metaphors-list::-webkit-scrollbar,
+        .transcript-content::-webkit-scrollbar { width: 6px; }
+        .metaphors-list::-webkit-scrollbar-track,
+        .transcript-content::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); border-radius: 4px; }
+        .metaphors-list::-webkit-scrollbar-thumb,
+        .transcript-content::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
+
+        .metaphor-item {
+            padding: 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            background: rgba(255, 255, 255, 0.01);
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .metaphor-item:hover { background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1); }
+        .metaphor-item.active { border-color: var(--accent-primary); background: rgba(0, 242, 254, 0.05); }
+
+        .metaphor-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .metaphor-name { font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; }
+        .metaphor-badge {
+            background: rgba(127, 0, 255, 0.2);
+            color: var(--accent-purple);
+            border: 1px solid rgba(127, 0, 255, 0.3);
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+
+        .metaphor-item-desc { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; }
+        .metaphor-item-footer { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); }
+        .metaphor-count { color: var(--accent-primary); font-weight: 600; }
+
+        /* Bottom Inspector */
+        .inspector-card { grid-column: 1 / -1; padding: 24px; margin-top: 24px; }
+        .inspector-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .inspector-title { font-family: var(--font-display); font-weight: 600; font-size: 1.3rem; }
+        .examples-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+        
+        .example-card {
+            padding: 16px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--card-border);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .example-card:hover { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.15); }
+        
+        .example-meta { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; }
+        .example-provider { font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
+        .example-provider.claude { color: var(--accent-claude); }
+        .example-provider.gemini { color: var(--accent-gemini); }
+        .example-snippet { font-size: 0.85rem; font-style: italic; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+        mark.highlight {
+            background-color: var(--highlight-bg);
+            color: var(--accent-primary);
+            border-bottom: 2px solid var(--highlight-border);
+            font-weight: 600;
+            padding: 1px 3px;
+        }
+
+        /* Modal */
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+            background: rgba(5, 7, 10, 0.85); backdrop-filter: blur(15px); align-items: center; justify-content: center; padding: 24px;
+        }
+        .modal-content {
+            background: #0f131a; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px;
+            max-width: 900px; width: 100%; max-height: 85%; display: flex; flex-direction: column; overflow: hidden;
+        }
+        .modal-header {
+            padding: 20px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-title h3 { font-family: var(--font-display); font-size: 1.25rem; font-weight: 600; }
+        .modal-close { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; }
+        .transcript-content { padding: 24px; overflow-y: auto; font-size: 0.95rem; white-space: pre-wrap; color: #d1d5db; }
+        .empty-state { text-align: center; color: var(--text-muted); padding: 40px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-title">
+                <h1>load-bearing</h1>
+                <p>Compare and track overused metaphorical language across Claude and Gemini</p>
+            </div>
+            <div><span class="stat-desc">Multi-Provider AI Linguistics</span></div>
+        </header>
+
+        <!-- Stats Row -->
+        <div class="stats-grid">
+            <div class="glass-card stat-card">
+                <span class="stat-label">Total Messages</span>
+                <span class="stat-value" id="stat-total-messages">0</span>
+                <span class="stat-desc" id="stat-messages-breakdown">Claude / Gemini</span>
+            </div>
+            <div class="glass-card stat-card">
+                <span class="stat-label">Total Words</span>
+                <span class="stat-value" id="stat-total-words">0</span>
+                <span class="stat-desc" id="stat-words-breakdown">Assistant words</span>
+            </div>
+            <div class="glass-card stat-card">
+                <span class="stat-label">Discovered Metaphors</span>
+                <span class="stat-value" id="stat-metaphor-count">0</span>
+                <span class="stat-desc">Linguistic signatures</span>
+            </div>
+            <div class="glass-card stat-card">
+                <span class="stat-label">Top Metaphor</span>
+                <span class="stat-value" id="stat-top-metaphor" style="font-size: 1.35rem; display: flex; align-items: center; height: 100%;">N/A</span>
+                <span class="stat-desc" id="stat-top-metaphor-desc">Highest overall count</span>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <div class="left-column">
+                <div class="glass-card chart-card">
+                    <div class="chart-header">
+                        <span class="chart-title">Frequency Trends</span>
+                        <div class="chart-controls">
+                            <button class="btn-toggle active" id="btn-freq" onclick="setChartMetric('frequency')">Density / 10k Words</button>
+                            <button class="btn-toggle" id="btn-count" onclick="setChartMetric('count')">Count</button>
+                            <div class="filter-checkboxes">
+                                <label><input type="checkbox" id="chk-claude" checked onchange="renderChart()"> Claude</label>
+                                <label><input type="checkbox" id="chk-gemini" checked onchange="renderChart()"> Gemini</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-container"><canvas id="trendsChart"></canvas></div>
+                </div>
+            </div>
+
+            <div class="right-column">
+                <div class="glass-card list-card">
+                    <div class="search-box">
+                        <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input type="text" class="search-input" id="search-bar" placeholder="Search metaphors..." onkeyup="filterMetaphors()">
+                    </div>
+                    <div class="metaphors-list" id="metaphors-list-container"></div>
+                </div>
+            </div>
+
+            <div class="glass-card inspector-card">
+                <div class="inspector-header">
+                    <span class="inspector-title" id="inspector-title-text">Conversation Snippets</span>
+                    <span class="stat-desc" id="inspector-subtitle">Select a metaphor above to inspect actual transcripts</span>
+                </div>
+                <div class="examples-grid" id="examples-container">
+                    <div class="empty-state">No metaphor selected. Click one to view contexts.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal" id="transcript-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <h3 id="modal-project">Project Name</h3>
+                    <p id="modal-timestamp">Timestamp</p>
+                </div>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="transcript-content" id="modal-transcript-text"></div>
+        </div>
+    </div>
+
+    <!-- Script tags for double-click fallback loading -->
+    <script src="trends.js"></script>
+    <script>
+        let dataset = null;
+        let activeMetaphor = null;
+        let chartMetric = 'frequency';
+        let chartInstance = null;
+
+        const milestones = [
+            { date: '2024-03', label: 'Claude 3 Opus' },
+            { date: '2024-06', label: '3.5 Sonnet v1' },
+            { date: '2024-10', label: '3.5 Sonnet v2' },
+            { date: '2026-02', label: 'Gemini 3.5' }
+        ];
+
+        window.addEventListener('DOMContentLoaded', () => {
+            // Try fetching dynamically (working when served on HTTP port)
+            fetch('/trends.json')
+                .then(res => res.json())
+                .then(data => {
+                    dataset = data;
+                    initDashboard();
+                })
+                .catch(err => {
+                    console.log("Serving offline or file:// protocol, falling back to trends.js loader.");
+                    if (typeof TREND_DATA !== 'undefined') {
+                        dataset = TREND_DATA;
+                        initDashboard();
+                    } else {
+                        document.getElementById('metaphors-list-container').innerHTML = 
+                            `<div class="empty-state">Error: No datasets found. Run 'load-bearing run' to analyze logs.</div>`;
+                    }
+                });
+        });
+
+        function initDashboard() {
+            // Baselines totals
+            let claudeMsgs = 0, claudeWords = 0;
+            let geminiMsgs = 0, geminiWords = 0;
+
+            if (dataset.baselines.claude) {
+                Object.values(dataset.baselines.claude).forEach(m => {
+                    claudeMsgs += m.total_messages;
+                    claudeWords += m.total_words;
+                });
+            }
+            if (dataset.baselines.gemini) {
+                Object.values(dataset.baselines.gemini).forEach(m => {
+                    geminiMsgs += m.total_messages;
+                    geminiWords += m.total_words;
+                });
+            }
+
+            document.getElementById('stat-total-messages').innerText = (claudeMsgs + geminiMsgs).toLocaleString();
+            document.getElementById('stat-messages-breakdown').innerText = `Claude: ${claudeMsgs.toLocaleString()} | Gemini: ${geminiMsgs.toLocaleString()}`;
+            
+            document.getElementById('stat-total-words').innerText = (claudeWords + geminiWords).toLocaleString();
+            document.getElementById('stat-words-breakdown').innerText = `Claude: ${claudeWords.toLocaleString()} | Gemini: ${geminiWords.toLocaleString()}`;
+            
+            document.getElementById('stat-metaphor-count').innerText = dataset.metaphors.length;
+            
+            if (dataset.metaphors.length > 0) {
+                const topMet = dataset.metaphors[0];
+                document.getElementById('stat-top-metaphor').innerText = `"${topMet.phrase}"`;
+                document.getElementById('stat-top-metaphor-desc').innerText = `Used ${topMet.total_count} times (${topMet.category})`;
+            }
+
+            // Toggles visibility of checkboxes if providers are missing
+            if (!dataset.providers.includes("claude")) document.getElementById('chk-claude').parentElement.style.display = 'none';
+            if (!dataset.providers.includes("gemini")) document.getElementById('chk-gemini').parentElement.style.display = 'none';
+
+            renderMetaphorList();
+
+            if (dataset.metaphors.length > 0) {
+                selectMetaphor(dataset.metaphors[0].phrase);
+            }
+        }
+
+        function renderMetaphorList(filterQuery = '') {
+            const container = document.getElementById('metaphors-list-container');
+            container.innerHTML = '';
+            
+            const filtered = dataset.metaphors.filter(m => 
+                m.phrase.toLowerCase().includes(filterQuery.toLowerCase()) || 
+                m.category.toLowerCase().includes(filterQuery.toLowerCase())
+            );
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="empty-state">No matching metaphors.</div>`;
+                return;
+            }
+
+            filtered.forEach(m => {
+                const isActive = activeMetaphor && activeMetaphor.phrase === m.phrase;
+                const div = document.createElement('div');
+                div.className = `metaphor-item ${isActive ? 'active' : ''}`;
+                div.onclick = () => selectMetaphor(m.phrase);
+                
+                div.innerHTML = `
+                    <div class="metaphor-item-header">
+                        <span class="metaphor-name">"${m.phrase}"</span>
+                        <span class="metaphor-badge">${m.category}</span>
+                    </div>
+                    <div class="metaphor-item-desc">${m.explanation}</div>
+                    <div class="metaphor-item-footer">
+                        <span>Total Uses: <span class="metaphor-count">${m.total_count}</span></span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function filterMetaphors() {
+            const query = document.getElementById('search-bar').value;
+            renderMetaphorList(query);
+        }
+
+        function selectMetaphor(phrase) {
+            activeMetaphor = dataset.metaphors.find(m => m.phrase === phrase);
+            
+            const searchVal = document.getElementById('search-bar').value;
+            renderMetaphorList(searchVal);
+
+            document.getElementById('inspector-title-text').innerText = `Matches for "${activeMetaphor.phrase}"`;
+            document.getElementById('inspector-subtitle').innerText = `${activeMetaphor.explanation} (${activeMetaphor.total_count} total uses)`;
+            
+            const expContainer = document.getElementById('examples-container');
+            expContainer.innerHTML = '';
+            
+            if (activeMetaphor.examples.length === 0) {
+                expContainer.innerHTML = `<div class="empty-state">No examples recorded.</div>`;
+            } else {
+                activeMetaphor.examples.forEach(ex => {
+                    const card = document.createElement('div');
+                    card.className = 'example-card';
+                    card.onclick = () => openModal(ex.project_name, ex.timestamp, ex.raw_text, activeMetaphor.phrase);
+                    
+                    const dateStr = new Date(ex.timestamp).toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
+                    const highlightedContext = highlightPhrase(ex.context, activeMetaphor.phrase);
+
+                    card.innerHTML = `
+                        <div class="example-meta">
+                            <span class="example-provider ${ex.provider}">${ex.provider}</span>
+                            <span>${dateStr}</span>
+                        </div>
+                        <div class="example-snippet">"${highlightedContext}"</div>
+                    `;
+                    expContainer.appendChild(card);
+                });
+            }
+
+            renderChart();
+        }
+
+        function highlightPhrase(text, phrase) {
+            const escaped = phrase.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const pattern = '\\b' + escaped.replace(/\\ /g, '[- ]') + '\\b';
+            const rx = new RegExp(`(${pattern})`, 'gi');
+            return text.replace(rx, '<mark class="highlight">$1</mark>');
+        }
+
+        function setChartMetric(metric) {
+            chartMetric = metric;
+            document.getElementById('btn-freq').className = metric === 'frequency' ? 'btn-toggle active' : 'btn-toggle';
+            document.getElementById('btn-count').className = metric === 'count' ? 'btn-toggle active' : 'btn-toggle';
+            renderChart();
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById('trendsChart').getContext('2d');
+            
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            const months = dataset.months;
+            const chartDatasets = [];
+            const showClaude = document.getElementById('chk-claude').checked;
+            const showGemini = document.getElementById('chk-gemini').checked;
+
+            if (activeMetaphor) {
+                // 1. Plot Claude Trends
+                if (showClaude && activeMetaphor.provider_trends.claude) {
+                    const claudeVals = months.map(m => {
+                        const trend = activeMetaphor.provider_trends.claude[m];
+                        return trend ? (chartMetric === 'frequency' ? trend.frequency : trend.count) : 0;
+                    });
+                    
+                    chartDatasets.push({
+                        label: `Claude - "${activeMetaphor.phrase}"`,
+                        data: claudeVals,
+                        borderColor: '#ff8a65',
+                        backgroundColor: 'rgba(255, 138, 101, 0.05)',
+                        borderWidth: 3,
+                        tension: 0.35,
+                        pointBackgroundColor: '#ff8a65',
+                        pointBorderColor: '#000',
+                        pointRadius: 4
+                    });
+                }
+
+                // 2. Plot Gemini Trends
+                if (showGemini && activeMetaphor.provider_trends.gemini) {
+                    const geminiVals = months.map(m => {
+                        const trend = activeMetaphor.provider_trends.gemini[m];
+                        return trend ? (chartMetric === 'frequency' ? trend.frequency : trend.count) : 0;
+                    });
+                    
+                    chartDatasets.push({
+                        label: `Gemini - "${activeMetaphor.phrase}"`,
+                        data: geminiVals,
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56, 189, 248, 0.05)',
+                        borderWidth: 3,
+                        tension: 0.35,
+                        pointBackgroundColor: '#38bdf8',
+                        pointBorderColor: '#000',
+                        pointRadius: 4
+                    });
+                }
+            }
+
+            // Milestone vertical lines
+            const milestonePlugin = {
+                id: 'milestonePlugin',
+                beforeDraw: (chart) => {
+                    const c = chart.ctx;
+                    const xAxis = chart.scales.x;
+                    const yAxis = chart.scales.y;
+                    
+                    milestones.forEach(milestone => {
+                        const xIdx = months.indexOf(milestone.date);
+                        if (xIdx !== -1) {
+                            const xPixel = xAxis.getPixelForTick(xIdx);
+                            c.save();
+                            c.beginPath();
+                            c.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                            c.lineWidth = 1;
+                            c.setLineDash([4, 4]);
+                            c.moveTo(xPixel, yAxis.top);
+                            c.lineTo(xPixel, yAxis.bottom);
+                            c.stroke();
+                            
+                            c.restore();
+                            c.save();
+                            c.fillStyle = '#8b949e';
+                            c.font = '500 10px Outfit';
+                            c.textAlign = 'right';
+                            c.translate(xPixel - 4, yAxis.top + 15);
+                            c.rotate(-Math.PI / 2);
+                            c.fillText(milestone.label, 0, 0);
+                            c.restore();
+                        }
+                    });
+                }
+            };
+
+            const yAxisTitle = chartMetric === 'frequency' 
+                ? 'Density (Occurrences per 10,000 assistant words)' 
+                : 'Raw count of occurrences';
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels: months, datasets: chartDatasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: '#8b949e', font: { family: 'Outfit', size: 11 } }
+                        },
+                        tooltip: {
+                            backgroundColor: '#0f131a',
+                            titleFont: { family: 'Plus Jakarta Sans', weight: '600' },
+                            bodyFont: { family: 'Outfit' },
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#8b949e', font: { family: 'Outfit', size: 11 } } },
+                        y: {
+                            title: { display: true, text: yAxisTitle, color: '#8b949e', font: { family: 'Outfit', size: 12 } },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#8b949e', font: { family: 'Outfit', size: 11 } }
+                        }
+                    }
+                },
+                plugins: [milestonePlugin]
+            });
+        }
+
+        function openModal(project, timestamp, text, phrase) {
+            document.getElementById('modal-project').innerText = project;
+            const dateStr = new Date(timestamp).toLocaleString(undefined, {
+                year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+            document.getElementById('modal-timestamp').innerText = dateStr;
+            document.getElementById('modal-transcript-text').innerHTML = highlightPhrase(text, phrase);
+            document.getElementById('transcript-modal').style.display = 'flex';
+        }
+
+        function closeModal() { document.getElementById('transcript-modal').style.display = 'none'; }
+        window.onclick = function(event) {
+            const modal = document.getElementById('transcript-modal');
+            if (event.target === modal) closeModal();
+        }
+    </script>
+</body>
+</html>
