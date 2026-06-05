@@ -16,6 +16,7 @@ DEFAULT_DB = "messages.db"
 DEFAULT_CANDIDATES = "candidates.json"
 DEFAULT_METAPHOR_OUTPUT = "verified_metaphors.json"
 DEFAULT_TRENDS_OUTPUT = "trends.json"
+DEFAULT_CODEX_LOGS = str(Path.home() / ".codex" / "sessions")
 
 class DashboardHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, pkg_dir=None, **kwargs):
@@ -90,6 +91,9 @@ def run_extraction(provider, logs_dir, db_path):
     elif provider == "gemini":
         from load_bearing.extractors.gemini import GeminiExtractor
         extractor = GeminiExtractor(logs_dir)
+    elif provider == "codex":
+        from load_bearing.extractors.codex import CodexExtractor
+        extractor = CodexExtractor(logs_dir)
     else:
         print(f"Error: Unknown provider '{provider}'")
         conn.close()
@@ -116,6 +120,11 @@ def run_pipeline(args, run_llm=True):
     gemini_logs = args.gemini_logs or str(Path.home() / ".gemini" / "antigravity" / "brain")
     if Path(gemini_logs).exists():
         run_extraction("gemini", gemini_logs, db_path)
+
+    # 3. Extract Codex (default path)
+    codex_logs = args.codex_logs or str(Path.home() / ".codex" / "sessions")
+    if Path(codex_logs).exists():
+        run_extraction("codex", codex_logs, db_path)
 
     # Check if we actually indexed messages
     conn = get_db_connection(db_path)
@@ -184,10 +193,11 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
 
     # Command: run (full pipeline)
-    run_parser = subparsers.add_parser("run", help="Run the full analysis pipeline (with LLM verify)")
+    run_parser = subparsers.add_parser("run", help="Run the complete analysis pipeline (with LLM verify)")
     run_parser.add_argument("--db", type=str, default=DEFAULT_DB, help="SQLite database path")
     run_parser.add_argument("--claude-logs", type=str, help="Claude projects directory path")
     run_parser.add_argument("--gemini-logs", type=str, help="Gemini logs directory path")
+    run_parser.add_argument("--codex-logs", type=str, help="Codex sessions directory path")
     run_parser.add_argument("--model", type=str, default="gpt-5.4-mini", help="OpenAI model for verify")
     run_parser.add_argument("--blacklist", type=str, default="blacklist.txt", help="Blacklist file path")
     run_parser.add_argument("--serve", action="store_true", help="Start dashboard server after run")
@@ -198,13 +208,14 @@ def main():
     quick_parser.add_argument("--db", type=str, default=DEFAULT_DB, help="SQLite database path")
     quick_parser.add_argument("--claude-logs", type=str, help="Claude projects directory path")
     quick_parser.add_argument("--gemini-logs", type=str, help="Gemini logs directory path")
+    quick_parser.add_argument("--codex-logs", type=str, help="Codex sessions directory path")
     quick_parser.add_argument("--blacklist", type=str, default="blacklist.txt", help="Blacklist file path")
     quick_parser.add_argument("--serve", action="store_true", help="Start dashboard server after run")
     quick_parser.add_argument("--port", type=int, default=8080, help="Dashboard port")
 
     # Command: extract
     ext_parser = subparsers.add_parser("extract", help="Extract logs from a specific provider")
-    ext_parser.add_argument("--provider", type=str, required=True, choices=["claude", "gemini"], help="Log provider")
+    ext_parser.add_argument("--provider", type=str, required=True, choices=["claude", "gemini", "codex"], help="Log provider")
     ext_parser.add_argument("--logs-dir", type=str, required=True, help="Logs directory path")
     ext_parser.add_argument("--db", type=str, default=DEFAULT_DB, help="SQLite database path")
 

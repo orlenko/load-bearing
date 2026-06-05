@@ -19,6 +19,7 @@
             --accent-secondary: #7f00ff;
             --accent-claude: #ff8a65;
             --accent-gemini: #38bdf8;
+            --accent-codex: #a78bfa;
             --highlight-bg: rgba(0, 242, 254, 0.2);
             --highlight-border: #00f2fe;
             --font-display: 'Plus Jakarta Sans', sans-serif;
@@ -226,6 +227,7 @@
         .example-provider { font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
         .example-provider.claude { color: var(--accent-claude); }
         .example-provider.gemini { color: var(--accent-gemini); }
+        .example-provider.codex { color: var(--accent-codex); }
         .example-snippet { font-size: 0.85rem; font-style: italic; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
         mark.highlight {
@@ -301,6 +303,7 @@
                             <div class="filter-checkboxes">
                                 <label><input type="checkbox" id="chk-claude" checked onchange="renderChart()"> Claude</label>
                                 <label><input type="checkbox" id="chk-gemini" checked onchange="renderChart()"> Gemini</label>
+                                <label><input type="checkbox" id="chk-codex" checked onchange="renderChart()"> Codex</label>
                             </div>
                         </div>
                     </div>
@@ -385,6 +388,7 @@
             // Baselines totals
             let claudeMsgs = 0, claudeWords = 0;
             let geminiMsgs = 0, geminiWords = 0;
+            let codexMsgs = 0, codexWords = 0;
 
             if (dataset.baselines.claude) {
                 Object.values(dataset.baselines.claude).forEach(m => {
@@ -398,12 +402,28 @@
                     geminiWords += m.total_words;
                 });
             }
+            if (dataset.baselines.codex) {
+                Object.values(dataset.baselines.codex).forEach(m => {
+                    codexMsgs += m.total_messages;
+                    codexWords += m.total_words;
+                });
+            }
 
-            document.getElementById('stat-total-messages').innerText = (claudeMsgs + geminiMsgs).toLocaleString();
-            document.getElementById('stat-messages-breakdown').innerText = `Claude: ${claudeMsgs.toLocaleString()} | Gemini: ${geminiMsgs.toLocaleString()}`;
+            document.getElementById('stat-total-messages').innerText = (claudeMsgs + geminiMsgs + codexMsgs).toLocaleString();
             
-            document.getElementById('stat-total-words').innerText = (claudeWords + geminiWords).toLocaleString();
-            document.getElementById('stat-words-breakdown').innerText = `Claude: ${claudeWords.toLocaleString()} | Gemini: ${geminiWords.toLocaleString()}`;
+            let breakdownText = "";
+            if (claudeMsgs > 0) breakdownText += `Claude: ${claudeMsgs.toLocaleString()} `;
+            if (geminiMsgs > 0) breakdownText += `| Gemini: ${geminiMsgs.toLocaleString()} `;
+            if (codexMsgs > 0) breakdownText += `| Codex: ${codexMsgs.toLocaleString()} `;
+            document.getElementById('stat-messages-breakdown').innerText = breakdownText.trim().replace(/^\| /, "");
+            
+            document.getElementById('stat-total-words').innerText = (claudeWords + geminiWords + codexWords).toLocaleString();
+            
+            let wordsText = "";
+            if (claudeWords > 0) wordsText += `Claude: ${claudeWords.toLocaleString()} `;
+            if (geminiWords > 0) wordsText += `| Gemini: ${geminiWords.toLocaleString()} `;
+            if (codexWords > 0) wordsText += `| Codex: ${codexWords.toLocaleString()} `;
+            document.getElementById('stat-words-breakdown').innerText = wordsText.trim().replace(/^\| /, "");
             
             document.getElementById('stat-metaphor-count').innerText = dataset.metaphors.length;
             
@@ -416,6 +436,7 @@
             // Toggles visibility of checkboxes if providers are missing
             if (!dataset.providers.includes("claude")) document.getElementById('chk-claude').parentElement.style.display = 'none';
             if (!dataset.providers.includes("gemini")) document.getElementById('chk-gemini').parentElement.style.display = 'none';
+            if (!dataset.providers.includes("codex")) document.getElementById('chk-codex').parentElement.style.display = 'none';
 
             renderMetaphorList();
 
@@ -525,6 +546,7 @@
             const chartDatasets = [];
             const showClaude = document.getElementById('chk-claude').checked;
             const showGemini = document.getElementById('chk-gemini').checked;
+            const showCodex = document.getElementById('chk-codex') ? document.getElementById('chk-codex').checked : false;
 
             if (activeMetaphor) {
                 // 1. Plot Claude Trends
@@ -562,6 +584,26 @@
                         borderWidth: 3,
                         tension: 0.35,
                         pointBackgroundColor: '#38bdf8',
+                        pointBorderColor: '#000',
+                        pointRadius: 4
+                    });
+                }
+
+                // 3. Plot Codex Trends
+                if (showCodex && activeMetaphor.provider_trends.codex) {
+                    const codexVals = months.map(m => {
+                        const trend = activeMetaphor.provider_trends.codex[m];
+                        return trend ? (chartMetric === 'frequency' ? trend.frequency : trend.count) : 0;
+                    });
+                    
+                    chartDatasets.push({
+                        label: `Codex - "${activeMetaphor.phrase}"`,
+                        data: codexVals,
+                        borderColor: '#a78bfa',
+                        backgroundColor: 'rgba(167, 139, 250, 0.05)',
+                        borderWidth: 3,
+                        tension: 0.35,
+                        pointBackgroundColor: '#a78bfa',
                         pointBorderColor: '#000',
                         pointRadius: 4
                     });
