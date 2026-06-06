@@ -301,9 +301,9 @@
                             <button class="btn-toggle active" id="btn-freq" onclick="setChartMetric('frequency')">Density / 10k Words</button>
                             <button class="btn-toggle" id="btn-count" onclick="setChartMetric('count')">Count</button>
                             <div class="filter-checkboxes">
-                                <label><input type="checkbox" id="chk-claude" checked onchange="renderChart()"> Claude</label>
-                                <label><input type="checkbox" id="chk-gemini" checked onchange="renderChart()"> Gemini</label>
-                                <label><input type="checkbox" id="chk-codex" checked onchange="renderChart()"> Codex</label>
+                                <label><input type="checkbox" id="chk-claude" checked onchange="updateDashboard()"> Claude</label>
+                                <label><input type="checkbox" id="chk-gemini" checked onchange="updateDashboard()"> Gemini</label>
+                                <label><input type="checkbox" id="chk-codex" checked onchange="updateDashboard()"> Codex</label>
                             </div>
                         </div>
                     </div>
@@ -385,71 +385,148 @@
         });
 
         function initDashboard() {
-            // Baselines totals
-            let claudeMsgs = 0, claudeWords = 0;
-            let geminiMsgs = 0, geminiWords = 0;
-            let codexMsgs = 0, codexWords = 0;
-
-            if (dataset.baselines.claude) {
-                Object.values(dataset.baselines.claude).forEach(m => {
-                    claudeMsgs += m.total_messages;
-                    claudeWords += m.total_words;
-                });
-            }
-            if (dataset.baselines.gemini) {
-                Object.values(dataset.baselines.gemini).forEach(m => {
-                    geminiMsgs += m.total_messages;
-                    geminiWords += m.total_words;
-                });
-            }
-            if (dataset.baselines.codex) {
-                Object.values(dataset.baselines.codex).forEach(m => {
-                    codexMsgs += m.total_messages;
-                    codexWords += m.total_words;
-                });
-            }
-
-            document.getElementById('stat-total-messages').innerText = (claudeMsgs + geminiMsgs + codexMsgs).toLocaleString();
-            
-            let breakdownText = "";
-            if (claudeMsgs > 0) breakdownText += `Claude: ${claudeMsgs.toLocaleString()} `;
-            if (geminiMsgs > 0) breakdownText += `| Gemini: ${geminiMsgs.toLocaleString()} `;
-            if (codexMsgs > 0) breakdownText += `| Codex: ${codexMsgs.toLocaleString()} `;
-            document.getElementById('stat-messages-breakdown').innerText = breakdownText.trim().replace(/^\| /, "");
-            
-            document.getElementById('stat-total-words').innerText = (claudeWords + geminiWords + codexWords).toLocaleString();
-            
-            let wordsText = "";
-            if (claudeWords > 0) wordsText += `Claude: ${claudeWords.toLocaleString()} `;
-            if (geminiWords > 0) wordsText += `| Gemini: ${geminiWords.toLocaleString()} `;
-            if (codexWords > 0) wordsText += `| Codex: ${codexWords.toLocaleString()} `;
-            document.getElementById('stat-words-breakdown').innerText = wordsText.trim().replace(/^\| /, "");
-            
-            document.getElementById('stat-metaphor-count').innerText = dataset.metaphors.length;
-            
-            if (dataset.metaphors.length > 0) {
-                const topMet = dataset.metaphors[0];
-                document.getElementById('stat-top-metaphor').innerText = `"${topMet.phrase}"`;
-                document.getElementById('stat-top-metaphor-desc').innerText = `Used ${topMet.total_count} times (${topMet.category})`;
-            }
-
             // Toggles visibility of checkboxes if providers are missing
             if (!dataset.providers.includes("claude")) document.getElementById('chk-claude').parentElement.style.display = 'none';
             if (!dataset.providers.includes("gemini")) document.getElementById('chk-gemini').parentElement.style.display = 'none';
             if (!dataset.providers.includes("codex")) document.getElementById('chk-codex').parentElement.style.display = 'none';
 
+            updateDashboard(true);
+        }
+
+        function updateDashboard(isInitial = false) {
+            const showClaude = document.getElementById('chk-claude').checked;
+            const showGemini = document.getElementById('chk-gemini').checked;
+            const showCodex = document.getElementById('chk-codex') ? document.getElementById('chk-codex').checked : false;
+
+            // 1. Recalculate Totals (Top Stats)
+            let totalMsgs = 0, totalWords = 0;
+            let breakdownText = "";
+            let wordsText = "";
+
+            if (showClaude && dataset.baselines.claude) {
+                let mCount = 0, wCount = 0;
+                Object.values(dataset.baselines.claude).forEach(m => { mCount += m.total_messages; wCount += m.total_words; });
+                totalMsgs += mCount;
+                totalWords += wCount;
+                breakdownText += `Claude: ${mCount.toLocaleString()} `;
+                wordsText += `Claude: ${wCount.toLocaleString()} `;
+            }
+            if (showGemini && dataset.baselines.gemini) {
+                let mCount = 0, wCount = 0;
+                Object.values(dataset.baselines.gemini).forEach(m => { mCount += m.total_messages; wCount += m.total_words; });
+                totalMsgs += mCount;
+                totalWords += wCount;
+                if (breakdownText) breakdownText += "| ";
+                breakdownText += `Gemini: ${mCount.toLocaleString()} `;
+                if (wordsText) wordsText += "| ";
+                wordsText += `Gemini: ${wCount.toLocaleString()} `;
+            }
+            if (showCodex && dataset.baselines.codex) {
+                let mCount = 0, wCount = 0;
+                Object.values(dataset.baselines.codex).forEach(m => { mCount += m.total_messages; wCount += m.total_words; });
+                totalMsgs += mCount;
+                totalWords += wCount;
+                if (breakdownText) breakdownText += "| ";
+                breakdownText += `Codex: ${mCount.toLocaleString()} `;
+                if (wordsText) wordsText += "| ";
+                wordsText += `Codex: ${wCount.toLocaleString()} `;
+            }
+
+            document.getElementById('stat-total-messages').innerText = totalMsgs.toLocaleString();
+            document.getElementById('stat-messages-breakdown').innerText = breakdownText.trim().replace(/^\| /, "") || "No providers selected";
+            document.getElementById('stat-total-words').innerText = totalWords.toLocaleString();
+            document.getElementById('stat-words-breakdown').innerText = wordsText.trim().replace(/^\| /, "") || "No providers selected";
+
+            // 2. Calculate current active counts for all metaphors
+            dataset.metaphors.forEach(m => {
+                let activeCount = 0;
+                if (showClaude && m.provider_trends.claude) {
+                    Object.values(m.provider_trends.claude).forEach(t => activeCount += t.count);
+                }
+                if (showGemini && m.provider_trends.gemini) {
+                    Object.values(m.provider_trends.gemini).forEach(t => activeCount += t.count);
+                }
+                if (showCodex && m.provider_trends.codex) {
+                    Object.values(m.provider_trends.codex).forEach(t => activeCount += t.count);
+                }
+                m.current_active_count = activeCount;
+            });
+
+            // Filter out metaphors with active count = 0
+            const activeMetaphorsList = dataset.metaphors.filter(m => m.current_active_count > 0);
+
+            // Sort by active count descending
+            activeMetaphorsList.sort((a, b) => b.current_active_count - a.current_active_count);
+
+            document.getElementById('stat-metaphor-count').innerText = activeMetaphorsList.length;
+
+            if (activeMetaphorsList.length > 0) {
+                const topMet = activeMetaphorsList[0];
+                document.getElementById('stat-top-metaphor').innerText = `"${topMet.phrase}"`;
+                document.getElementById('stat-top-metaphor-desc').innerText = `Used ${topMet.current_active_count} times (${topMet.category})`;
+            } else {
+                document.getElementById('stat-top-metaphor').innerText = "N/A";
+                document.getElementById('stat-top-metaphor-desc').innerText = "No active metaphors";
+            }
+
+            // Render list
             renderMetaphorList();
 
-            if (dataset.metaphors.length > 0) {
-                selectMetaphor(dataset.metaphors[0].phrase);
+            // Handle active metaphor selection
+            if (activeMetaphor) {
+                const stillActive = activeMetaphorsList.find(m => m.phrase === activeMetaphor.phrase);
+                if (stillActive) {
+                    selectMetaphor(stillActive.phrase);
+                } else {
+                    if (activeMetaphorsList.length > 0) {
+                        selectMetaphor(activeMetaphorsList[0].phrase);
+                    } else {
+                        clearActiveMetaphor();
+                    }
+                }
+            } else {
+                if (activeMetaphorsList.length > 0) {
+                    selectMetaphor(activeMetaphorsList[0].phrase);
+                } else {
+                    clearActiveMetaphor();
+                }
             }
+        }
+
+        function clearActiveMetaphor() {
+            activeMetaphor = null;
+            document.getElementById('inspector-title-text').innerText = "Conversation Snippets";
+            document.getElementById('inspector-subtitle').innerText = "Select a metaphor above to inspect actual transcripts";
+            document.getElementById('examples-container').innerHTML = `<div class="empty-state">No active metaphors matching your criteria.</div>`;
+            renderChart();
         }
 
         function renderMetaphorList(filterQuery = '') {
             const container = document.getElementById('metaphors-list-container');
             container.innerHTML = '';
             
-            const filtered = dataset.metaphors.filter(m => 
+            const showClaude = document.getElementById('chk-claude').checked;
+            const showGemini = document.getElementById('chk-gemini').checked;
+            const showCodex = document.getElementById('chk-codex') ? document.getElementById('chk-codex').checked : false;
+
+            const activeMetaphorsList = dataset.metaphors.filter(m => {
+                let activeCount = 0;
+                if (showClaude && m.provider_trends.claude) {
+                    Object.values(m.provider_trends.claude).forEach(t => activeCount += t.count);
+                }
+                if (showGemini && m.provider_trends.gemini) {
+                    Object.values(m.provider_trends.gemini).forEach(t => activeCount += t.count);
+                }
+                if (showCodex && m.provider_trends.codex) {
+                    Object.values(m.provider_trends.codex).forEach(t => activeCount += t.count);
+                }
+                m.current_active_count = activeCount;
+                return activeCount > 0;
+            });
+
+            activeMetaphorsList.sort((a, b) => b.current_active_count - a.current_active_count);
+
+            const filtered = activeMetaphorsList.filter(m => 
                 m.phrase.toLowerCase().includes(filterQuery.toLowerCase()) || 
                 m.category.toLowerCase().includes(filterQuery.toLowerCase())
             );
@@ -472,7 +549,7 @@
                     </div>
                     <div class="metaphor-item-desc">${m.explanation}</div>
                     <div class="metaphor-item-footer">
-                        <span>Total Uses: <span class="metaphor-count">${m.total_count}</span></span>
+                        <span>Active Uses: <span class="metaphor-count">${m.current_active_count}</span></span>
                     </div>
                 `;
                 container.appendChild(div);
@@ -490,16 +567,39 @@
             const searchVal = document.getElementById('search-bar').value;
             renderMetaphorList(searchVal);
 
+            const showClaude = document.getElementById('chk-claude').checked;
+            const showGemini = document.getElementById('chk-gemini').checked;
+            const showCodex = document.getElementById('chk-codex') ? document.getElementById('chk-codex').checked : false;
+
+            let activeCount = 0;
+            if (showClaude && activeMetaphor.provider_trends.claude) {
+                Object.values(activeMetaphor.provider_trends.claude).forEach(t => activeCount += t.count);
+            }
+            if (showGemini && activeMetaphor.provider_trends.gemini) {
+                Object.values(activeMetaphor.provider_trends.gemini).forEach(t => activeCount += t.count);
+            }
+            if (showCodex && activeMetaphor.provider_trends.codex) {
+                Object.values(activeMetaphor.provider_trends.codex).forEach(t => activeCount += t.count);
+            }
+            activeMetaphor.current_active_count = activeCount;
+
             document.getElementById('inspector-title-text').innerText = `Matches for "${activeMetaphor.phrase}"`;
-            document.getElementById('inspector-subtitle').innerText = `${activeMetaphor.explanation} (${activeMetaphor.total_count} total uses)`;
+            document.getElementById('inspector-subtitle').innerText = `${activeMetaphor.explanation} (${activeMetaphor.current_active_count} active uses)`;
             
             const expContainer = document.getElementById('examples-container');
             expContainer.innerHTML = '';
             
-            if (activeMetaphor.examples.length === 0) {
-                expContainer.innerHTML = `<div class="empty-state">No examples recorded.</div>`;
+            const filteredExamples = activeMetaphor.examples.filter(ex => {
+                if (ex.provider === 'claude' && showClaude) return true;
+                if (ex.provider === 'gemini' && showGemini) return true;
+                if (ex.provider === 'codex' && showCodex) return true;
+                return false;
+            });
+
+            if (filteredExamples.length === 0) {
+                expContainer.innerHTML = `<div class="empty-state">No examples recorded under current filter.</div>`;
             } else {
-                activeMetaphor.examples.forEach(ex => {
+                filteredExamples.forEach(ex => {
                     const card = document.createElement('div');
                     card.className = 'example-card';
                     card.onclick = () => openModal(ex.project_name, ex.timestamp, ex.raw_text, activeMetaphor.phrase);
