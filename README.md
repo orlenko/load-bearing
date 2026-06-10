@@ -1,4 +1,9 @@
+
+<img width="1122" height="1402" alt="image" src="https://github.com/user-attachments/assets/55318769-4122-4510-a726-2877f9f0bfb3" />
+
+
 # load-bearing: AI Metaphor Discovery & Analysis Tool
+
 
 `load-bearing` is an automated NLP pipeline that discovers, classifies, and tracks overused metaphorical language and idioms in your AI coding assistant conversation history. 
 
